@@ -1,0 +1,157 @@
+Docker-Compose
+-----------------
+
+Why: configure relationships between  containers 
+Why: save our docker container run settings in easy-to-read file
+Why: create one-liner developer environment startups
+Comprised of 2 separate but related things:
+1. YAML-formatted file that describes our solution option for:
+- containers
+- networks
+- volumes
+
+2. A CLI tool "docker-compose" used for local dev/test automation with those 
+YAML files
+
+docker-compose.yml
+-------------------
+Compose YAML format has it's own versions: 1, 2, 2.1, 3, 3.1
+
+The newer version - the more features.
+
+YAML file can be used with:
+a) "docker-compose" command for local docker automation
+b) "docker" directly in production with Swarm (v1.13)
+
+$ docker-compose --help
+
+docker-compose.yml is default filename, but any can be used with:
+$ docker-compose -f myfile.yml
+
+Шаблон для docker-compose.yml
+---------------------------
+version: '3.1'  # if no version is specificed then v1 is assumed. Recommend v2 minimum
+
+services:  # containers. same as docker run
+  servicename: # a friendly name. this is also DNS name inside network
+    image: # Optional if you use build:
+    command: # Optional, replace the default CMD specified by the image
+    environment: # Optional, same as -e in docker run
+    volumes: # Optional, same as -v in docker run
+  servicename2:
+
+volumes: # Optional, same as docker volume create
+
+networks: # Optional, same as docker network create
+
+Простой пример
+----------------
+version: '2'
+
+# same as 
+# docker run -p 80:4000 -v $(pwd):/site bretfisher/jekyll-serve
+
+services:
+  jekyll:
+    image: bretfisher/jekyll-serve
+    volumes:
+      - .:/site
+    ports:
+      - '80:4000'
+      
+Более сложный пример
+-------------------
+version: '2'
+
+services:
+
+  wordpress:
+    image: wordpress
+    ports:
+      - 8080:80
+    environment:
+      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: example
+      WORDPRESS_DB_PASSWORD: examplePW
+    volumes:
+      - ./wordpress-data:/var/www/html
+
+  mysql:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: examplerootPW
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: example
+      MYSQL_PASSWORD: examplePW
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
+  
+===========================================
+docker-compose CLI
+===========================================
+CLI tools comes with Docker for Windows/Mac, but separate download for Linux.
+Not a production-grade tool but ideal for local development and test. 
+        
+Two most common commands are 
+  $ docker-compose up      //setup volumes/networks and start all containers 
+  $ docker-compose down    //stop all containers and remove all cont/vol/net 
+  
+$ docker-compose up -d     //start in background
+$ docker-compose logs      //watch logs 
+
+A lot of the commands existing in "docker" exist in "docker-compose"
+$ docker-compose ps       // list of containers running
+$ docker-compose top      // all services running in inside containers
+      
+docker-compose can build images using "$docker-compose up" if not found in cache.
+
+Using docker-compose to build Images
+-----------
+$ docker-compose build   // build image even if it exists in cache.
+
+An alternate way to rebuild image using option "--build"
+$ docker-compose up --build 
+
+For complex builds can be used build vars (build args)
+
+Пример с файлом конфигурации:
+
+version: '2'
+services:
+  proxy:
+    build:
+      context: .
+      dockerfile: nginx.Dockerfile
+    image: nginx-custom     
+    ports:
+      - '80:80'
+  web:
+    image: httpd
+    volumes:
+      - ./html:/usr/local/apache2/htdocs/
+      
+Мы имеем докер файл nginx.Dockerfile, на основе которого 
+будет собран кастомный образ nginx (со встроенным конфигом реверсивного прокси) 
+
+Образ фала будет построен в текущей директории (context: .)    
+
+Когда я запущу команду $docker-compose up, произойдет поиск image in cache. 
+Если не найдет, запустит команду на создание image from Dockerfile:
+
+FROM nginx:1.13
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+Если нужно удалить собранный образ при остановки сервисов, используем "--rmi"
+$ docker-compose down --rmi
+
+Если не задавать имена сервисам, образам и сетям, имена будут созданы автоматом
+как производные из названия директории откуда запущены
+
+$ docker-compose down --rmi local // Удалит такие образы с автоматически созданными именами
+
+

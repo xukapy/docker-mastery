@@ -1,0 +1,242 @@
+Section 3 (Images)
+------------------
+
+Q What is an image?
+A It's application binaries and dependences for your app and the metadata on how 
+  to run it
+
+There is not actually a complete OS or kernel or kernel modules (e.g. drivers) 
+because the host provides the kernel. 
+
+На https://hub.docker.com/ можно найти кучу разных image. Image может быть
+"официальным" или нет. В первом случае такой image не имеет префикса 
+пользователя. Например, nginx. В противном случае было бы xukapy/nginx.
+Official images поддерживают целые команды разработчиков, тщательно тестируют и
+документируют. Также отличительной чертой такого image наличие версий в описании, 
+например:
+  1.19.0, mainline, 1, 1.19, latest
+  1.18.0, stable, 1.18
+
+Image не имеют обязательного имени. К ним обращаются через tag.
+Одна и таже версия image может иметь несколько tags
+
+
+$ docker pull nginx // Скачиваем образ из репозитория [д]
+
+Если не указан тег, будет скачана последняя версия (с тегом latest)
+При работе в продакшине, тестировании правильнее указывать точную версию образа.
+
+
+$ docker image ls  // посмотреть все скачанные образы
+
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+nginx               latest              2622e6cca7eb        3 weeks ago         132MB
+nginx               alpine              7d0cdcc60a96        4 weeks ago         21.3MB
+alpine              latest              e7d92cdc71fe        5 months ago        5.59MB
+
+IMAGE ID - это по сути контрольная сумма образа.
+
+Image Layers 
+-------------
+Image is not some big blob of data. Images are designed using the union file 
+system concept of making layers about the changes.
+
+$ docker image history - show layers of changes made in image.
+
+$ docker image history nginx:latest
+IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
+231d40e811cd        2 months ago        /bin/sh -c #(nop)  CMD ["nginx" "-g" "daemon…   0B                  
+<missing>           2 months ago        /bin/sh -c #(nop)  STOPSIGNAL SIGTERM           0B                  
+<missing>           2 months ago        /bin/sh -c #(nop)  EXPOSE 80                    0B                  
+<missing>           2 months ago        /bin/sh -c ln -sf /dev/stdout /var/log/nginx…   22B                 
+<missing>           2 months ago        /bin/sh -c set -x     && addgroup --system -…   57.1MB              
+<missing>           2 months ago        /bin/sh -c #(nop)  ENV PKG_RELEASE=1~buster     0B                  
+<missing>           2 months ago        /bin/sh -c #(nop)  ENV NJS_VERSION=0.3.7        0B                  
+<missing>           2 months ago        /bin/sh -c #(nop)  ENV NGINX_VERSION=1.17.6     0B                  
+<missing>           2 months ago        /bin/sh -c #(nop)  LABEL maintainer=NGINX Do…   0B                  
+<missing>           2 months ago        /bin/sh -c #(nop)  CMD ["bash"]                 0B                  
+<missing>           2 months ago        /bin/sh -c #(nop) ADD file:bc8179c87c8dbb3d9…   69.2MB 
+
+
+Every image starts from the very beginning  with a blank layer known as scratch.
+
+Каждый слой имеет свой хешь и повторно не скачивается. 
+
+Когда мы запускаем контейнер, помимо слоев из image, описанных в Dockerfile, 
+создается еще один read/write слой сверху. 
+
+Q Почему файловая система кажется нам обычной
+A Специальный докерский драйвер превращает слоеную файловую систему в "обычную"
+
+Можем запустить два контейнера на одном образе. Тогда нижние слои будут одними 
+и теме же файлами и только верхние слои иметь отличия
+
+ ------------   -------------
+ |   CON1   |   |  CON2     |    read/write layers 
+ ------------   -------------
+ ____________________________
+|       Alpine               |   read only  layer
+----------------------------- 
+
+А что будет если я в контейнере (скажем во втором) поменяю файл, который уже 
+был в образе. Файл просто скопируется в слой CON2 и измения не коснутся 
+файла в слое Alpine. Это называется "Copy on write" -> CoW
+
+$ docker image inspect  // return JSON metadata about the image
+
+This is basically the metadata.
+
+Tagging
+----------
+
+$ docker image tag  //assign one or more tags to an image
+
+У образов нет имен. Если выполнить команду ls, мы не увидим колонки NAME. Вместо 
+этого будет REPOSITORY, TAG, IMAGE_ID
+
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+nginx               latest              2622e6cca7eb        3 weeks ago         132MB
+nginx               alpine              7d0cdcc60a96        4 weeks ago         21.3MB
+alpine              latest              e7d92cdc71fe        5 months ago        5.59MB
+
+Сослаться на image можно с помощью трех атрибутов: 
+  REPOSITORY
+  TAG 
+  третий атрибут не представлен в выводе команды ls
+  
+Репозиторий (REPOSITORY) состоит из [user name]/[repository name]
+Официальные репозитории состоят только из [repository name]
+  
+$ docker image tag nginx xukapy/nginx 
+
+Появится еще один image с новым репозиторием и тегом. 
+Чтобы он появился в репозитори на сайте dockerhub.com в списке моих репозиториев
+нужно выполнить push 
+
+$ docker image push  //upload changed layers to a image registry.
+
+$ docker image push xukapy/nginx 
+
+Но просто так в свой репозиторий не залить - нужно залогиниться c помощью login,
+иначе будет ошибка:
+denied: requested access to the resource is denied
+
+
+$ docker login
+ Username: xukapy
+ Password:
+ 
+Он сохранит информацию о логине в пользоватльской директории (на маке в Keychain) 
+
+Добавим еще один тэг образу:
+
+$ docker image tag xukapy/nginx xukapy/nginx:testing
+$ docker push xukapy/nginx:testing
+
+Building images 
+---------------
+Рассмотрим докер-файл (udemy-docker-mastery/dockerfile-sample-1/Dockerfile)
+Он выглядит как shell script, но это не он. Совершенно другой язык,
+специальный для Докерфайла
+
+$ docker build -f some-dockerfile  //default name "Dockerfile"
+
+Каждый докер-файл начинается с команды FROM, в которой указывается дистрибутив
+
+  FROM debian:jessie
+  
+Сейчас все чаще указывают Alpine. Главное преимущество обычных дистрибутивов  
+(Ubuntu, Debian, CentOs) - это пакетные менеджеры, позволяющие простым способом
+доустанавливает отсутсвующее ПО 
+
+Дальше идет команда ENV - для переменных окружения
+
+  ENV NGINX_VERSION 1.13.6-1~stretch
+  
+Каждая последующая команда из Dockerfile может использовать эту переменную.
+Каждая команда в докер-файле - это по сути очередной слой, так что порядок команд
+очень важен.
+
+Команда RUN -- выполняет действие (shell команду или скрипт ). 
+Обычно там сразу несколько команд объединенных &&. Это сделано специально, чтобы
+не плодить слои. Так как каждая отдельная команда (stanza) RUN создает новый 
+слой.
+
+RUN ln -sf /dev/stdout /var/log/nginx/access.log \
+	&& ln -sf /dev/stderr /var/log/nginx/error.log
+  
+Эта команда перенаправляет информацию из лог файлов в стандартные устройства, 
+откуда специальный лог-модуль Докера можест считать и отдать пользователю.
+В противном случае пришлось организовывать доступ к этим лог файлам и после
+перезапуска контейнера всебы очистилось или наоборот росло.  
+
+EXPOSE 80 443
+По умолчанию все TCP и UDP порты закрыты. Ничто не светит в Docker Virtual Network
+Команда EXPOSE открывает порт в контейнере. Но на на хосте все равно нужно 
+открывать порт, используя -p
+
+CMD ["nginx", "-g", "daemon off;"]
+И наконец обязательная финальная CMD команда, которая будет выполнена каждый
+раз при запуске контейнера
+
+
+Имея только один докер файл можно уже построить свой образ (image):
+ $ docker image build -t customnginx .
+                      -------------- -- 
+                        image name   current dir (where to search dockfile)
+
+Имя образу можно задавать без префикса, так как мы не собираемся его публиковать
+на Docker hub
+
+
+Пример простого Dockerfile 
+----------------------------
+У нас в директории два файла Dockerfile и  index.html (наш маленький сайт)
+
+# this same shows how we can extend/change an existing official image from Docker Hub
+
+FROM nginx:latest
+# highly recommend you always pin versions for anything beyond dev/learn
+
+WORKDIR /usr/share/nginx/html
+# change working directory to root of nginx webhost
+# using WORKDIR is preferred to using 'RUN cd /some/path'
+
+COPY index.html index.html
+
+# I don't have to specify EXPOSE or CMD because they're in my FROM
+
+
+Станза COPY для копирования файлов с локальной машины или билд сервера в образ.
+
+Теперь соберем образ и запустим контейнер:
+$ docker image build -t nginx-with-html .
+$ docker container run -p 80:80 --rm nginx-with-html
+
+Если нас устраивает тот образ, который мы создали, можно отправить его в свой
+репозиторий на  DockerHub. Для это нужно выполнить retag и push нашего образа:
+$ docker image tag nginx-with-html:latest xukapy/nginx-with-html:latest
+$ docker image push xukapy/nginx-with-html:latest
+
+
+Using Prune to Keep Your Docker System Clean 
+---------------------------------------------
+You can use "prune" commands to clean up images, volumes, build cache, and 
+containers. Examples include:
+
+$ docker image prune   // to clean up just "dangling" images
+
+$ docker system prune  // will clean up everything
+
+$ docker image prune -a //remove all images you're not using
+
+$ docker system df //to see space usage.
+
+ 
+
+
+
+  
+  
+
+ 

@@ -1,0 +1,62 @@
+Container lifetime & Persistent Data
+------------------------------------
+
+Containers are immutable (unchanging) and ephemeral (temporary).
+
+separation of concerns - разделение ответственности.
+
+Код и данные должны вестись отдельно
+
+Persistent Data: Volumes
+------------------------
+Способ сохранять переменную чать образа отдельно от контейнера.
+В фаловой системе контейнера для файла (папки) создается мапинг 
+на файл (директорию) вне UFS. Она постоянна между редеполоем самого
+котейнера. Там можно хранить например файлы данных БД.
+
+  VOLUME command in Dockerfile
+ 
+Пример:
+VOLUME /var/lib/mysql
+
+При старте контейнера создастся VOLUME и назначится на этот путь внутри 
+контейнера. Т.е. есть все файлы которые будут помещены в  /var/lib/mysql будут
+жить вне контейнера пока не будут удалены вручную. Этот папку нельзя очистить
+просто удалив контейнер.
+
+Чтобы посмотреть есть ли VOLUME в образе, выполним команду:
+$ docker image inspect 
+-----
+В JSON файле найдем Config -> Volumes
+
+После запуска контейнера выполним:
+$ docker container inspect mysql 
+-----
+В JSON файле будет Volumes  и Mounts - путь, куда на примаплена папка в 
+самой файловой системе хоста. В linux это реальный путь. В OSX и Windows - это
+путь внутри виртуальной машины.
+
+$ docker volume ls  // Список volumes
+
+$ docker volume inspect 2e53e.....
+---
+{JSON}
+
+Из контейнера видно какой volume он использует. Обраное не верно.
+
+Если запустить новый контейнер - тот создаст свой volume.
+
+Если запустить контейнер с опцией -v [name:]path можно задать volume 
+$ docker container run -d --name mysql -v /var/lib/mysql 
+Здесь мы ничего нового не сделали. Просто повторили команду из Dockerfile 
+
+$ docker container run -d --name mysql -v mysql-db:/var/lib/mysql 
+Здесь мы уже задали имя volume: mysql-db 
+
+Если мы запустим новый контейнер с опцией -v mysql-db:/var/lib/mysql 
+новый volume не создасться. Будет использован существующий.
+
+Задание
+--------
+docker container run --name postgres961 -e POSTGRES_PASSWORD=test -d -v pgdata:/var/lib/postgresql/d postgres:9.6.1
+                 

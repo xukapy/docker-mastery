@@ -1,0 +1,34 @@
+Докер не запускает нативно в ядре МакОС. Он создает маленькую виртуальную 
+машину с линуксом на борту.
+
+Настройка виртуальной маны для мака:
+ 2 CPU
+ 4 GB - оперативки
+ 
+Докер не сожрет сразу всю память, а только по необходимости
+
+
+$ docker version // 19.03.05  версия docker engine 
+
+
+Удобно сделать в консоле автодополнение команд. Описано в докумтации.
+У меня работает, но подсказывает только команды, но не их описание как 
+у автора. Видимо, что-то не донастроил
+
+
+! Полезная вещь для мака Homebrew. Независимый репозиторий
+!! Но Docker из него ставить не нужно, лучше это делать с сайта
+
+macOS Bash Tab Completion
+-------------
+Tab completion lets you quickly fill the rest of a command or argument as you 
+type by hitting Tab. Assuming you're running Docker for Mac, you'll want to 
+connect up the completion scripts that come with Docker for Mac to your shell. 
+Docker talks about this in their docs.  
+1. install docker 
+2. install completion with brew 
+3. update your .bash_profile 
+4. symlink your docker completion files 
+5. restart your terminal.
+
+

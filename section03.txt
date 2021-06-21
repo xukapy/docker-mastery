@@ -1,0 +1,364 @@
+Контейнеры - это фундаментальные строительные блоки Docker 
+
+Check version CLI and Engine
+----------------------------
+$ docker version
+
+Client: Docker Engine - Community
+ Version:           19.03.5
+ API version:       1.40
+ ...
+
+Server: Docker Engine - Community
+ Engine:
+  Version:          19.03.5
+  ...
+  
+Клиентская терминальная программа (Client) общается с демоном (Engine).
+В моем случае их версии совпадают. Тот факт, что сервер мне ответил (прислал
+информацию о своей версии), говорит что все установлено и работает.
+
+$docker info -- Куча дополнительной информации по серверу
+
+$docker      -- Список команд docker 
+
+Существует две модели команд в docker:
+  1) $docker <command> (options)
+      это "старый" способ
+  2) $docker <command> <sub-command> (options) 
+      это новый способ.
+      Команд стало так много, что решили их реорганизовать через промежуточные
+      команды.
+      
+Оба способа работают.             
+
+
+Create Nginx(web server) container
+----------------------------
+
+Image vs container 
+--
+An Image is the application we want to run 
+A Container is an instance of that image running as a process
+
+We can have many containers running of the same image 
+
+Дефолтный репозиторий(registry) образов (images)  - Docker Hub (hub.docker.com)
+
+$ docker container run --publish 80:80 nginx
+
+1) Скачает образ(image) nginx из репозитория Docker hub
+2) Запустит контейнер с этим образом.
+3) Откроет 80 порт на моей машине
+4) Перенаправит весь трафик на IP контейнера и 80 порт
+Все сообщения о работе сервра nginx будут падать в консоль
+
+Но не хочется, чтобы это все висело в консоле на виду.
+
+$ docker container run --publish 80:80 --detach  nginx
+fea0c5233cdb138738232e12df78bbd7dd5340603e68ebb290959063f4b4be69
+$
+
+--detach (or -d) tells Docker to run it in the background. And we get back the unique
+container ID
+
+$ docker container ls        // Посмотреть список всех запущенных контейнеров
+
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                NAMES
+fea0c5233cdb        nginx               "nginx -g 'daemon of…"   3 minutes ago       Up 3 minutes        0.0.0.0:80->80/tcp   youthful_villani
+
+$ docker container stop fea0 // Остановить контейнер. Можно не набирать весь ID
+
+$ docker container ls -a    // Посмотреть список всех контейнеров 
+                            //  (даже остановленных)
+
+Покажет 2 контейнера, но почему ДВА? Каждый раз делая команду run мы запускаем
+новый контейнер. Чтобы запускать и останавливать один и тот же контейнер, нужно
+использовать команду: 
+   docker container start 
+
+Имя контейнера должно быть уникальным как и ID. Если мы его не указывает, докер
+задаст его за нас. Чтобы указать свое имя:
+
+$ docker container run --publish 80:80 --detach --name webhost  nginx  
+  
+$ docker container ls -a
+CONTAINER ID        IMAGE               COMMAND                  CREATED              STATUS                      PORTS                NAMES
+4ecebfa3a9e3        nginx               "nginx -g 'daemon of…"   About a minute ago   Up About a minute           0.0.0.0:80->80/tcp   webhost
+fea0c5233cdb        nginx               "nginx -g 'daemon of…"   16 minutes ago       Exited (0) 10 minutes ago                        youthful_villani
+4eeaeb9e5537        nginx               "nginx -g 'daemon of…"   29 minutes ago       Exited (0) 17 minutes ago                        unruffled_gates
+
+Чтобы посмотреть логи контейра, запущенного в бэкграунде
+$ docker container logs webhost 
+172.17.0.1 - - [22/Dec/2019:19:12:06 +0000] "GET / HTTP/1.1" 200 612 "-" "
+....
+
+Список процессов в контейнере
+$ docker container top webhost
+PID                 USER                TIME                COMMAND
+2839                root                0:00                nginx: master process nginx -g daemon off;
+2878                101                 0:00                nginx: worker process
+
+Чтобы удалить все контейнеры
+$ docker container rm 4ec fea 4ee
+fea
+4ee
+Error response from daemon: You cannot remove a running container 4ecebfa3a9e31cf28ae997c46b645dfbe5f94b66dd0a7fc6ff71943dafa32a83. 
+Stop the container before attempting removal or force remove
+
+Один контейнер не удалился, так как он запущен. Чтобы его удалить можно сначала 
+его остановить. А можно использовать ключ "-f" (force).
+$ docker container rm -f 4ec
+
+
+Что же происходит когда мы выполняем 'docker container run'?
+
+1. Ищем образ локально в 'image cache', ничего не находит
+2. Ищем в удаленном репозитории образов (по умолчанию Docker hub)
+3. Скачивает последнюю версию (мы не указывали версию)
+4. Создает новый контейнер на основе image и приготавливатся к старту
+5. Дает новый виртуальный IP в часной сети внутри движка контейнера
+6. Открывает 80 порт на хосте и форвардит на 80 порт контейнера
+7. Запускает контейнер, используя CMD  в image Dockerfile
+                                                              change CMD run on start
+                                                                     --------
+$docker container run --publish 8080:80 --name webhost -d nginx:1.11 nginx -T
+                                -----                         ------
+                          change listening port          change version of image 
+
+
+Контейнеры это не мини VM -  всего лишь процессы, запущенные на вашем хосте
+
+
+1. Помним про команду получения справки --help
+2. docs.docker.com
+
+It's a rare that a day thats goes by that I don't go to that website.
+ to check it out.
+ 
+У нас будет трехконтейнерное приложение: 
+  nginx (80:80), mysql (3306:3306), httpd(apach) (8080:80) server
+
+tear down - снести (дом, приложение)
+
+spit out - выплюнуть
+
+Передача переменных окружения в контейнер при запуске:
+  Когда запускаете mysql, используйте --env (или -e) для передачи переменных в
+  контейнер. Например, 
+  MYSQL_RANDOM_ROOT_PASSWORD=yes 
+
+Этот пароль выплевывается в лог контейнера: docker container logs
+  
+That's silly - это тупо
+
+detached mode
+
+container spins up
+
+What's going on in containers
+-----
+$ docker container top  // список процессов в контейнере
+
+$ docker container inspect // детализация файла конфига
+
+$ docker containers stats // performance stats for all containers
+
+Let's dive in - давайте послушаем, давайте углубимся.
+
+No need for SSH
+-----
+
+to mess around with - поиграть с, возиться с, связываться
+
+$ docker container run -it // start new container interactively
+  Просто запускает shell внутри контейнера
+  
+$ docker container exec -it // run additional command in existing container
+
+На самом, деле "-it" - это две команды:
+  -t  pseudo-tty (simulates a real terminal, like what SSH does )
+  -i  interactive (keep session open to receive terminal input)
+  
+Чтобы "попасть" внутрь контейнера, получить доступ к консоли, нам нет 
+необходимости использовать SSH:
+
+bash (shell) if run with "-it", it will give you a terminal inside the running 
+container:
+$ docker container run -it --name proxy nginx bash   
+root...:/#       
+
+Т.е. мы взяли образ nginx за основу контейнера, но изменили команду на запуск bash
+и велели контейнеру оставаться интерактивным и с эмуляцией терминала
+
+Как видно, мы зашли под рутом.
+
+Чтобы выйти из SHELL, необходимо ввести "exit":
+root...:/# exit
+
+При выходе контейнер остановится, так как контейр живет, пока живет команда 
+с которой он запустился (а мы вышли из шела)
+
+Если мы хотим, чтобы контейнер сразу удалился, используем опцию --rm
+
+Можно сразу использовать образ дистрибутива linux:
+$ docker container run -it --name ubuntu ubuntu  
+
+Этот образ Ubuntu минимальный. С liveCD устанавливает намного больше. Все 
+недостающее можно докачать с помощью пакетного менеджера apt.
+
+Если выйти из шелл (с остановкой контейнера) и затем снова стартовать 
+контейнер с помощью команды start,  все изменения останутся. Если создать новый
+контейнер из образа, изменений не будет.
+
+Команда "start" слегка отличается от "run":
+$ docker container start -ai ubuntu 
+
+А что, если я хочу подсоединиться к уже запущенному контейнеру. Это можно
+сделать с помощью команды "exec":
+  docker container exec   - запускает дополнительный процес в работающем контейнере
+  
+Например, нам нужно подключиться к командной строке MySQL с целью администрирования:
+$ docker container exec -it mysql bash
+
+Если выйти из шелла с помощью "exit", контейнер не остановится. В нем все еще 
+будет запущен демон MySQL
+
+Вместо образа Ubuntu можно использовать Alpine. Это супер миимальный дисьтрибутив,
+образ которого весит всего 5Mb (против 150Mb ubuntu). Этот дистрибутив идет со
+своим пакетным менеджером (apk).
+
+Если попробовать запустить bash в контейнере:
+$ docker container run -it alpine bash 
+получим ошибку, так как "bash" отсутствует в контейнере. 
+
+Мы столкнульсь с базовой концепцией контейров: 
+----------------------------------------------------------------------------------
+|Контейнер можно стартовать, только той программой, которая в нем уже установлена. 
+----------------------------------------------------------------------------------
+
+Так как же нам попасть внутрь  образа Alpine? В нем есть другой шелл - SH:
+$ docker container run -it alpine sh
+/ #
+
+
+Docker Networks: Concepts
+--------------------------
+   host network <---> | NAT | <----> private virtual network
+                                   <bridge> <bridge>   <bridge>
+                                      C1      C2   ...  Cn
+
+• Each container connected to a private virtual network "bridge"
+• Each virtual network routes through NAT firewall on host IP 
+• All containers on a virtual network can talk to each other without "-p"
+• Best practice is to create a new virtual network for each app:
+   - network "my_web_app" for MySQL and php/Apache containers
+   - network "my_api" for mongo and nodejs containers
+   
+Batteries Included (slang), in a product usability (mostly in software) it states 
+that the product comes together with all possible parts required for full usability. 
+
+We can:
+• Make new virtual networks 
+• Attach containers to more then one virtual network (or none)
+• Skip virtual networks and use host IP (--net=host)  
+  Цепляемся напрямую к интерфейсу хоста, минуя NAT и виртуальную сеть в целом.
+  Когда нам очень нужна производительность сетевого интефеса и пох на безопасность
+• Use different Docker network drivers to gain new abilities
+
+$ docker container port <container> - посмотреть  какие порты открыты для контейнера
+               
+80/tcp -> 0.0.0.0:80
+
+-- format  A common option for formatting the output of commands using GO templates
+Можно конечно использовать команду grep, но --format работает точнее 
+
+
+$ docker container inspect --format '{{ .NetworkSettings.IPAddress }}' nginx
+172.17.0.2
+
+Anywhere I do a docker container run <stuff> nginx , where nginx  is the image 
+you should use, replace that with nginx:alpine , which still has ping command in it.
+
+There are other ways to solve this, including adding the ping util with apt-get, 
+making your own image, etc. More info in this Q&A answer. 
+/#: apt-get update && apt-get install -y iputils-ping
+
+$ docker network ls                  // show networks
+NETWORK ID          NAME                DRIVER              SCOPE
+2b7b18f164fc        bridge              bridge              local
+4e626cbb77f5        host                host                local
+4b9e97856fd9        none                null                local
+
+По умолчанию все контейнеры цепляются к сети "bridge"
+$ docker network inspect             // inspect a network
+$ docker network inspect bridge 
+...
+"Containers": {
+        "0e3176757578c504be9fcb1dff6b175b7325e2fb71c801dd21a01da7f4487dcf": {
+            "Name": "mysql",
+            "EndpointID": "51059862d373f03659821c37c5fca0c6b980cb4e7311c0df587dc7f2536c298f",
+            "MacAddress": "02:42:ac:11:00:03",
+            "IPv4Address": "172.17.0.3/16",
+        },
+        "35c45dd2f15fe6e35be2922f07376258c26b44f5d760eef15af0edbb13c8b8ee": {
+            "Name": "nginx",
+            "EndpointID": "deb783a531c10b9c871ed81ea32c3f2578f46c6d364e3c57ffc99b3b660bcbb9",
+            "MacAddress": "02:42:ac:11:00:02",
+            "IPv4Address": "172.17.0.2/16",
+        }
+...
+
+Сеть host специализированная, цепляется напрямую к сетевому интерфейсу хоста
+Сеть none - имитирует неподключенный интерфейс 
+
+$ docker network create [--driver]   // create a network 
+
+--network  // При создании контейнера можно указать сеть
+
+Необязательно указывать сеть при создании контейнера. Есть возможность подключать
+контейнер к сети и отключать его "на лету"
+$ docker network connect             // attach a network to container
+$ docker network disconnect          // detach a network from container
+
+Docker Networks: Default Security
+-------------------
+• Create your apps so frontend/backend sit on the same Docker network
+• Their inter-communication never leaves host
+• All externally exposed ports closed by default 
+• You must manually expose via -p, which is better default security
+
+Docker Networks: DNS
+--------------------
+Static IP's and using IP's for talking to containers is an anti-pattern. Do your
+best to avoid it.
+
+Docker daemon has a build-in DNS server that containers use by default.
+
+Т.е. один контейнер может видеть другой не по IP адресу, а по имени контейнера.
+При подключении контенера к новой виртуальной сети, DNS начинает работать 
+автоматически для этой сети. В дефолтной сети bridge DNS сервер выключен по 
+умолчанию.
+
+Чтобы связать контейнеры в этой сети, можно при создании указывать параметр --link
+, но проще создать новую сеть.
+
+DNS Round Robin
+----------------
+Это возможность DNS сервера задавать разным контейнерам одинаковые DNS имена. 
+Например, для баланса нагрузки или увеличения безотказности работы. Во встроенном
+DNS сервере есть такая возможность. Это не настоящий балансировщик, но это работает
+
+Чтобы указать альтернативное имя используем опцию --network-alias при старте 
+контейнера:
+$ docker container run --detach --network my_app_net  --network-alias search elasticsearch:2
+
+
+
+ 
+
+
+    
+
+
+
